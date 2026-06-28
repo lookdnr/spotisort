@@ -9,5 +9,6 @@ unit-testable with in-memory fakes.
 from __future__ import annotations
 
 from spotisort.services.library import SpotifyLibrary
+from spotisort.services.playlists import PlaylistManager
 
-__all__ = ["SpotifyLibrary"]
+__all__ = ["SpotifyLibrary", "PlaylistManager"]
