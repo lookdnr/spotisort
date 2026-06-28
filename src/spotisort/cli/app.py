@@ -19,11 +19,21 @@ from functools import cached_property
 
 from spotisort.api.client import SpotifyClient
 from spotisort.api.exceptions import SpotisortError
+from spotisort.classification import ArtistGenreProvider, GenreClassifier, GenreTaxonomy
 from spotisort.config import ConfigurationError, Settings
 from spotisort.mapping import SpotifyMapper
 from spotisort.models import Playlist, SavedTrack
-from spotisort.repositories import LikedSongsRepository, PlaylistRepository
-from spotisort.services import LibraryOrganiser, PlaylistManager, SpotifyLibrary
+from spotisort.repositories import (
+    ArtistRepository,
+    LikedSongsRepository,
+    PlaylistRepository,
+)
+from spotisort.services import (
+    LibraryGrouper,
+    LibraryOrganiser,
+    PlaylistManager,
+    SpotifyLibrary,
+)
 
 logger = logging.getLogger("spotisort")
 
@@ -62,6 +72,10 @@ class Application:
         return PlaylistRepository(self.client, self.mapper, limits=self.settings.batch_limits)
 
     @cached_property
+    def artist_repository(self) -> ArtistRepository:
+        return ArtistRepository(self.client, self.mapper, limits=self.settings.batch_limits)
+
+    @cached_property
     def library(self) -> SpotifyLibrary:
         return SpotifyLibrary(self.liked_repository)
 
@@ -72,6 +86,14 @@ class Application:
     @cached_property
     def organiser(self) -> LibraryOrganiser:
         return LibraryOrganiser(self.library, self.playlists)
+
+    @cached_property
+    def genre_classifier(self) -> GenreClassifier:
+        return GenreClassifier(ArtistGenreProvider(self.artist_repository), GenreTaxonomy())
+
+    @cached_property
+    def grouper(self) -> LibraryGrouper:
+        return LibraryGrouper(self.playlists, self.organiser)
 
 
 # --------------------------------------------------------------------------- #
@@ -140,6 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_delete_command(subparsers)
     _add_copy_command(subparsers)
     _add_move_command(subparsers)
+    _add_unlike_command(subparsers)
+    _add_group_genre_command(subparsers)
 
     return parser
 
@@ -214,6 +238,35 @@ def _add_move_command(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     parser.add_argument("-y", "--yes", action="store_true", help="skip the confirmation prompt.")
     _add_filter_arguments(parser)
     parser.set_defaults(handler=cmd_move)
+
+
+def _add_unlike_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    parser = subparsers.add_parser(
+        "unlike", help="remove matching songs from Liked Songs (e.g. everything before a date)."
+    )
+    parser.add_argument("-y", "--yes", action="store_true", help="skip the confirmation prompt.")
+    _add_filter_arguments(parser)
+    parser.set_defaults(handler=cmd_unlike)
+
+
+def _add_group_genre_command(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser(
+        "group-genre",
+        help="group matching liked songs into playlists by broad genre (removes them by default).",
+    )
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="copy into playlists instead of removing from Liked Songs.",
+    )
+    parser.add_argument(
+        "--prefix", default="", help="text to prepend to each genre playlist name (e.g. 'Genre: ')."
+    )
+    parser.add_argument("-y", "--yes", action="store_true", help="skip the confirmation prompt.")
+    _add_filter_arguments(parser)
+    parser.set_defaults(handler=cmd_group_genre)
 
 
 # --------------------------------------------------------------------------- #
@@ -307,9 +360,81 @@ def cmd_move(app: Application, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_unlike(app: Application, args: argparse.Namespace) -> int:
+    # Guard against accidentally clearing the whole library with a bare `unlike`.
+    if not _has_any_filter(args):
+        print(
+            "Refusing to unlike your entire library. Pass at least one filter, "
+            "e.g. --before 2020-01-01.",
+            file=sys.stderr,
+        )
+        return 2
+    selected = _select_saved(app.library, args)
+    if not selected:
+        print("No matching liked songs.")
+        return 0
+    prompt = f"Remove {len(selected)} track(s) from Liked Songs? This cannot be undone."
+    if not _confirm(prompt, assume_yes=args.yes):
+        print("Cancelled.")
+        return 0
+    removed = app.library.unlike(selected)
+    print(f"Removed {removed} track(s) from Liked Songs.")
+    return 0
+
+
+def cmd_group_genre(app: Application, args: argparse.Namespace) -> int:
+    selected = _select_saved(app.library, args)
+    if not selected:
+        print("No matching liked songs.")
+        return 0
+
+    remove = not args.keep
+    if remove:
+        prompt = (
+            f"Group {len(selected)} track(s) by genre into playlists and "
+            "remove them from Liked Songs?"
+        )
+        if not _confirm(prompt, assume_yes=args.yes):
+            print("Cancelled.")
+            return 0
+
+    name_template = f"{args.prefix}{{category}}" if args.prefix else "{category}"
+    result = app.grouper.group(
+        selected,
+        app.genre_classifier,
+        remove_from_library=remove,
+        name_template=name_template,
+    )
+
+    for outcome in result.groups:
+        if remove:
+            print(
+                f"{outcome.playlist.name}: +{outcome.added} added, "
+                f"-{outcome.removed} from Liked Songs."
+            )
+        else:
+            print(f"{outcome.playlist.name}: +{outcome.added} added.")
+    if not result.groups:
+        print("Nothing could be classified by genre.")
+    if result.unclassified:
+        print(
+            f"{len(result.unclassified)} track(s) had no recognised genre "
+            "and were left in Liked Songs."
+        )
+    return 0
+
+
 # --------------------------------------------------------------------------- #
 # Handler helpers
 # --------------------------------------------------------------------------- #
+
+
+def _has_any_filter(args: argparse.Namespace) -> bool:
+    """Whether at least one liked-song selection filter was supplied."""
+    return any(
+        getattr(args, name, None) is not None
+        for name in ("before", "after", "artist", "album", "year", "search")
+    )
 
 
 def _select_saved(library: SpotifyLibrary, args: argparse.Namespace) -> list[SavedTrack]:

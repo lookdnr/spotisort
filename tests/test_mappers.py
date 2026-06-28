@@ -8,7 +8,13 @@ import pytest
 
 from spotisort.api.exceptions import MappingError
 from spotisort.mapping import SpotifyMapper
-from tests.conftest import playlist_item, playlist_payload, saved_item, track_payload
+from tests.conftest import (
+    artist_payload,
+    playlist_item,
+    playlist_payload,
+    saved_item,
+    track_payload,
+)
 
 
 @pytest.fixture
@@ -53,3 +59,15 @@ def test_missing_name_raises_mapping_error(mapper: SpotifyMapper) -> None:
 def test_bad_timestamp_raises_mapping_error(mapper: SpotifyMapper) -> None:
     with pytest.raises(MappingError):
         mapper.saved_tracks.map({"added_at": "not-a-date", "track": track_payload()})
+
+
+def test_full_artist_maps_genres(mapper: SpotifyMapper) -> None:
+    payload = artist_payload("a1", "Daft Punk", genres=["french house", "filter house"])
+    artist = mapper.artists.map(payload)
+    assert artist.genres == ("french house", "filter house")
+
+
+def test_embedded_artist_has_no_genres(mapper: SpotifyMapper) -> None:
+    # Artists embedded in track payloads carry no genres.
+    track = mapper.tracks.map(track_payload())
+    assert track.artists[0].genres == ()

@@ -108,10 +108,35 @@ spotisort copy --to "2001 Favourites" --year 2001
 
 # Move matching liked songs into a playlist (removes them from Liked Songs)
 spotisort move --to "Archive" --before 2019-01-01
+
+# Remove matching songs from Liked Songs (e.g. clear out old saves)
+spotisort unlike --before 2020-01-01
+
+# Group liked songs into playlists by broad genre, removing them from Liked Songs
+spotisort group-genre --before 2023-01-01
+
+# ...or keep them in Liked Songs and just copy, with a name prefix
+spotisort group-genre --artist "Miles Davis" --keep --prefix "Genre: "
 ```
 
-`delete` and `move` prompt for confirmation; pass `-y`/`--yes` to skip it. Use
-`-v`/`--verbose` for debug logging.
+`delete`, `move`, `unlike` and `group-genre` prompt for confirmation; pass
+`-y`/`--yes` to skip it. `unlike` refuses to run without at least one filter (so
+it can't wipe your whole library by accident). Use `-v`/`--verbose` for debug
+logging.
+
+### Grouping by genre (and mood, later)
+
+`group-genre` reads each track's primary-artist genres from Spotify, maps them to
+broad buckets (Rock, Electronic, Hip-Hop, Jazz…), and routes each bucket into its
+own playlist. Tracks whose artist has no recognised genre are reported and left
+in Liked Songs untouched. Removal goes through the same add → verify → unlike
+path as `move`, so nothing is lost if a step fails.
+
+Classification sits behind a `TrackClassifier` interface, so a **mood** classifier
+can be added later without changing the grouping logic. Note that Spotify
+deprecated the audio-features endpoint for new apps in November 2024, so a future
+mood feature would derive mood from genre, an LLM, or user-defined rules rather
+than valence/energy.
 
 ## Development
 

@@ -128,6 +128,8 @@ class BatchLimits:
     playlist_modify_batch: int = 100
     #: Max tracks per save/remove request against the user's library.
     library_modify_batch: int = 50
+    #: Max artist ids per request when fetching full artists (GET /v1/artists).
+    artists_batch: int = 50
 
     def __post_init__(self) -> None:
         for name in self.__slots__:

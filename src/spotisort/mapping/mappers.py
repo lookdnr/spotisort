@@ -49,6 +49,7 @@ class ArtistMapper:
             name=_require_str(data, "name", context="artist"),
             uri=_optional_str(data, "uri"),
             url=_spotify_url(data),
+            genres=_str_tuple(data, "genres"),
         )
 
     def map_many(self, payloads: Iterable[Any] | None) -> tuple[Artist, ...]:
@@ -231,6 +232,14 @@ def _optional_int(payload: Mapping[str, Any], key: str) -> int | None:
     if isinstance(value, bool):
         return None
     return value if isinstance(value, int) else None
+
+
+def _str_tuple(payload: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    """Return a tuple of the string items of a list field, ignoring non-strings."""
+    value = payload.get(key)
+    if not isinstance(value, list):
+        return ()
+    return tuple(item for item in value if isinstance(item, str))
 
 
 def _spotify_url(payload: Mapping[str, Any]) -> str | None:

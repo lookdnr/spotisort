@@ -8,8 +8,9 @@ API-sized batches. They contain no business policy — that lives in
 
 from __future__ import annotations
 
+from spotisort.repositories.artists import ArtistRepository
 from spotisort.repositories.base import Repository
 from spotisort.repositories.liked_songs import LikedSongsRepository
 from spotisort.repositories.playlists import PlaylistRepository
 
-__all__ = ["LikedSongsRepository", "PlaylistRepository", "Repository"]
+__all__ = ["ArtistRepository", "LikedSongsRepository", "PlaylistRepository", "Repository"]

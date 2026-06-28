@@ -74,6 +74,16 @@ def playlist_item(track: dict[str, Any] | None) -> dict[str, Any]:
     return {"track": track}
 
 
+def artist_payload(
+    artist_id: str = "a1",
+    name: str = "Artist",
+    *,
+    genres: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Build a raw full-artist payload (as returned by GET /v1/artists)."""
+    return {"id": artist_id, "name": name, "genres": list(genres)}
+
+
 # --------------------------------------------------------------------------- #
 # Fake client
 # --------------------------------------------------------------------------- #
@@ -93,18 +103,25 @@ class FakeSpotifyClient:
         playlists: list[dict[str, Any]] | None = None,
         playlist_items: dict[str, list[dict[str, Any]]] | None = None,
         contains: dict[str, bool] | None = None,
+        artists: dict[str, dict[str, Any]] | None = None,
         user_id: str = "user-1",
     ) -> None:
         self._saved = list(saved or [])
         self._playlists = list(playlists or [])
         self._playlist_items = dict(playlist_items or {})
         self._contains = dict(contains or {})
+        self._artists = dict(artists or {})
         self._user_id = user_id
         self.calls: list[tuple[str, Any]] = []
 
     # -- user --
     def current_user_id(self) -> str:
         return self._user_id
+
+    # -- artists --
+    def artists(self, artist_ids: Sequence[str]) -> dict[str, Any]:
+        self.calls.append(("artists", list(artist_ids)))
+        return {"artists": [self._artists.get(artist_id) for artist_id in artist_ids]}
 
     # -- saved tracks --
     def saved_tracks(self, *, limit: int, offset: int) -> dict[str, Any]:

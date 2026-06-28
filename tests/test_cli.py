@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 
-from spotisort.cli.app import _format_saved, _select_saved, build_parser, main
-from spotisort.models import Album, Artist, SavedTrack, Track
+from spotisort.cli.app import (
+    _format_saved,
+    _select_saved,
+    build_parser,
+    cmd_group_genre,
+    cmd_unlike,
+    main,
+)
+from spotisort.models import Album, Artist, Playlist, SavedTrack, Track
+from spotisort.services import GroupingResult, GroupOutcome
 
 
 def make_saved(track_id: str, artist: str, year: int) -> SavedTrack:
@@ -47,6 +56,10 @@ class FakeLibrary:
     def search(self, query: str) -> list[SavedTrack]:
         return list(self._data)
 
+    def unlike(self, tracks: list[SavedTrack]) -> int:
+        self.unliked = list(tracks)
+        return len(self.unliked)
+
 
 def test_parser_parses_filters() -> None:
     parser = build_parser()
@@ -81,6 +94,50 @@ def test_format_saved_includes_year() -> None:
     line = _format_saved(make_saved("t1", "Aphex Twin", 2001))
     assert "Aphex Twin" in line
     assert "(2001)" in line
+
+
+def test_unlike_refuses_without_filter() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["unlike"])
+    # The guard fires before the app is touched, so a placeholder app is fine.
+    assert cmd_unlike(SimpleNamespace(), args) == 2
+
+
+def test_unlike_removes_filtered_tracks() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["unlike", "--year", "2001", "-y"])
+    data = [make_saved("t1", "Aphex Twin", 2001), make_saved("t2", "X", 1999)]
+    library = FakeLibrary(data)
+    app = SimpleNamespace(library=library)
+
+    assert cmd_unlike(app, args) == 0
+    assert [s.id for s in library.unliked] == ["t1"]
+
+
+class StubGrouper:
+    def __init__(self) -> None:
+        self.called: dict[str, object] = {}
+
+    def group(self, tracks, classifier, *, remove_from_library, name_template):  # type: ignore[no-untyped-def]
+        self.called = {
+            "count": len(list(tracks)),
+            "remove": remove_from_library,
+            "template": name_template,
+        }
+        outcome = GroupOutcome("Rock", Playlist(id="p", name="Rock"), added=1, removed=0)
+        return GroupingResult(groups=(outcome,), unclassified=())
+
+
+def test_group_genre_keep_invokes_grouper_without_removing() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["group-genre", "--year", "2001", "--keep", "--prefix", "Genre: "])
+    data = [make_saved("t1", "Aphex Twin", 2001)]
+    grouper = StubGrouper()
+    app = SimpleNamespace(library=FakeLibrary(data), grouper=grouper, genre_classifier=None)
+
+    assert cmd_group_genre(app, args) == 0
+    assert grouper.called["remove"] is False
+    assert grouper.called["template"] == "Genre: {category}"
 
 
 def test_main_returns_two_without_config(monkeypatch: pytest.MonkeyPatch) -> None:

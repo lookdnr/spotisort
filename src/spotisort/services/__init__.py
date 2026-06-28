@@ -8,6 +8,7 @@ unit-testable with in-memory fakes.
 
 from __future__ import annotations
 
+from spotisort.services.grouping import GroupingResult, GroupOutcome, LibraryGrouper
 from spotisort.services.library import SpotifyLibrary
 from spotisort.services.operations import (
     LibraryOrganiser,
@@ -17,6 +18,9 @@ from spotisort.services.operations import (
 from spotisort.services.playlists import PlaylistManager
 
 __all__ = [
+    "GroupOutcome",
+    "GroupingResult",
+    "LibraryGrouper",
     "LibraryOrganiser",
     "MoveResult",
     "MoveVerificationError",

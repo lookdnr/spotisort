@@ -114,6 +114,18 @@ class SpotifyClient:
         return self._user_id
 
     # ------------------------------------------------------------------ #
+    # Artists
+    # ------------------------------------------------------------------ #
+
+    def artists(self, artist_ids: Sequence[str]) -> dict[str, Any]:
+        """Return full artist objects for a single batch of ids (max 50)."""
+        return self._call(
+            self._client.artists,
+            list(artist_ids),
+            operation="fetch artists",
+        )
+
+    # ------------------------------------------------------------------ #
     # Liked songs (the user's saved tracks)
     # ------------------------------------------------------------------ #
 

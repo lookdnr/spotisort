@@ -6,9 +6,14 @@ import pytest
 
 from spotisort.api.exceptions import PlaylistNotFoundError
 from spotisort.config import Settings
-from spotisort.repositories import LikedSongsRepository, PlaylistRepository
+from spotisort.repositories import (
+    ArtistRepository,
+    LikedSongsRepository,
+    PlaylistRepository,
+)
 from tests.conftest import (
     FakeSpotifyClient,
+    artist_payload,
     playlist_item,
     playlist_payload,
     saved_item,
@@ -86,3 +91,22 @@ def test_playlist_create_uses_current_user(settings: Settings) -> None:
     repo.create("New", public=True)
 
     assert client.calls_of("create") == [{"user_id": "me", "name": "New"}]
+
+
+def test_artist_get_many_batches_dedups_and_skips_unknown(settings: Settings) -> None:
+    client = FakeSpotifyClient(
+        artists={
+            "a1": artist_payload("a1", genres=["rock"]),
+            "a2": artist_payload("a2", genres=["pop"]),
+            "a3": artist_payload("a3", genres=["jazz"]),
+            # "a4" intentionally absent -> Spotify returns null for it.
+        }
+    )
+    repo = ArtistRepository(client, limits=settings.batch_limits)  # artists_batch defaults to 50
+
+    result = repo.get_many(["a1", "a1", "a2", "a3", "a4", ""])
+
+    assert set(result) == {"a1", "a2", "a3"}
+    assert result["a2"].genres == ("pop",)
+    # Deduplicated + empty removed -> one request of 4 ids.
+    assert client.calls_of("artists") == [["a1", "a2", "a3", "a4"]]
