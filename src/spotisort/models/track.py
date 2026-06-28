@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from spotisort.models.album import Album
 from spotisort.models.artist import Artist
 
-__all__ = ["Track", "SavedTrack"]
+__all__ = ["SavedTrack", "Track"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +24,7 @@ class Track:
         explicit: Whether the track is flagged explicit.
         disc_number: The disc the track appears on, if known.
         track_number: The track's position on its disc, if known.
-        popularity: Spotify's 0–100 popularity score, if known.
+        popularity: Spotify's 0-100 popularity score, if known.
         is_local: Whether this is a local file rather than a catalogue track.
         uri: The Spotify URI (``spotify:track:...`` or a local URI). This is the
             identifier used when adding/removing the track to/from playlists.
@@ -65,9 +65,9 @@ class Track:
         return timedelta(milliseconds=self.duration_ms)
 
     def display_name(self) -> str:
-        """A human-readable ``"Artist 1, Artist 2 – Title"`` label."""
+        """A human-readable ``"Artist 1, Artist 2 - Title"`` label."""
         artists = ", ".join(self.artist_names)
-        return f"{artists} – {self.name}" if artists else self.name
+        return f"{artists} - {self.name}" if artists else self.name
 
 
 @dataclass(frozen=True, slots=True)

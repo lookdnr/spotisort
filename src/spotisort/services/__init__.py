@@ -17,9 +17,9 @@ from spotisort.services.operations import (
 from spotisort.services.playlists import PlaylistManager
 
 __all__ = [
-    "SpotifyLibrary",
-    "PlaylistManager",
     "LibraryOrganiser",
     "MoveResult",
     "MoveVerificationError",
+    "PlaylistManager",
+    "SpotifyLibrary",
 ]

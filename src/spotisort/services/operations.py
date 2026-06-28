@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from spotisort.api.exceptions import SpotisortError
-from spotisort.models import Playlist, SavedTrack, Track
+from spotisort.models import Playlist, SavedTrack
 from spotisort.services.library import SpotifyLibrary
 from spotisort.services.playlists import PlaylistManager, PlaylistRef, TrackRef
 

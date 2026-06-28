@@ -13,16 +13,16 @@ free of any third-party imports and can be depended upon by every layer.
 from __future__ import annotations
 
 __all__ = [
-    "SpotisortError",
-    "SpotifyApiError",
     "AuthenticationError",
+    "MappingError",
+    "PlaylistNotFoundError",
     "RateLimitError",
     "RequestFailedError",
-    "RetriesExhaustedError",
     "ResourceNotFoundError",
-    "PlaylistNotFoundError",
+    "RetriesExhaustedError",
+    "SpotifyApiError",
+    "SpotisortError",
     "TrackNotFoundError",
-    "MappingError",
 ]
 
 

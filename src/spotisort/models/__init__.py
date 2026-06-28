@@ -13,4 +13,4 @@ from spotisort.models.artist import Artist
 from spotisort.models.playlist import Playlist
 from spotisort.models.track import SavedTrack, Track
 
-__all__ = ["Artist", "Album", "Track", "SavedTrack", "Playlist"]
+__all__ = ["Album", "Artist", "Playlist", "SavedTrack", "Track"]

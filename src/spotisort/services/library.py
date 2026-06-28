@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from spotisort.models import SavedTrack, Track
 from spotisort.repositories import LikedSongsRepository
@@ -202,7 +202,7 @@ def _coerce_utc(moment: date | datetime) -> datetime:
         dt = datetime(moment.year, moment.month, moment.day)
     else:  # pragma: no cover - guarded by type hints
         raise TypeError(f"Expected a date or datetime, got {type(moment).__name__}.")
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
 def _extract_ids(tracks: Iterable[TrackLike]) -> list[str]:

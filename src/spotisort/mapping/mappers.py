@@ -18,19 +18,19 @@ cache or a direct-HTTP backend only needs new mappers, not new models.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from spotisort.api.exceptions import MappingError
 from spotisort.models import Album, Artist, Playlist, SavedTrack, Track
 
 __all__ = [
-    "ArtistMapper",
     "AlbumMapper",
-    "TrackMapper",
-    "SavedTrackMapper",
+    "ArtistMapper",
     "PlaylistMapper",
+    "SavedTrackMapper",
     "SpotifyMapper",
+    "TrackMapper",
 ]
 
 
@@ -252,5 +252,5 @@ def _parse_datetime(value: Any, *, context: str) -> datetime:
     except ValueError as exc:
         raise MappingError(f"Could not parse timestamp {value!r} in {context}.") from exc
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed

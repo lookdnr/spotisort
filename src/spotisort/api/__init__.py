@@ -23,14 +23,14 @@ from spotisort.api.exceptions import (
 )
 
 __all__ = [
-    "SpotisortError",
-    "SpotifyApiError",
     "AuthenticationError",
+    "MappingError",
+    "PlaylistNotFoundError",
     "RateLimitError",
     "RequestFailedError",
-    "RetriesExhaustedError",
     "ResourceNotFoundError",
-    "PlaylistNotFoundError",
+    "RetriesExhaustedError",
+    "SpotifyApiError",
+    "SpotisortError",
     "TrackNotFoundError",
-    "MappingError",
 ]

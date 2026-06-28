@@ -84,6 +84,13 @@ files = ["src", "tests"]
 module = ["spotipy.*"]
 ignore_missing_imports = true
 
+# Tests intentionally inject structural fakes (duck-typed stand-ins) into the
+# concrete services/repositories, so the precise-type "arg-type" check is noise
+# there. Everything else stays strict.
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disable_error_code = ["arg-type"]
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]

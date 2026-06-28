@@ -22,11 +22,11 @@ from pathlib import Path
 from dotenv import load_dotenv as _load_dotenv
 
 __all__ = [
+    "REQUIRED_SCOPES",
+    "BatchLimits",
     "ConfigurationError",
     "RetryPolicy",
-    "BatchLimits",
     "Settings",
-    "REQUIRED_SCOPES",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -104,7 +104,7 @@ class RetryPolicy:
         """Return the exponential backoff delay (seconds) for a 1-indexed attempt."""
         if attempt < 1:
             raise ValueError("attempt must be 1-indexed and >= 1.")
-        delay = self.backoff_base_seconds * (2 ** (attempt - 1))
+        delay: float = self.backoff_base_seconds * (2 ** (attempt - 1))
         return min(delay, self.backoff_max_seconds)
 
 

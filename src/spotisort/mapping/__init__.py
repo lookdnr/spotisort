@@ -16,10 +16,10 @@ from spotisort.mapping.mappers import (
 )
 
 __all__ = [
-    "ArtistMapper",
     "AlbumMapper",
-    "TrackMapper",
-    "SavedTrackMapper",
+    "ArtistMapper",
     "PlaylistMapper",
+    "SavedTrackMapper",
     "SpotifyMapper",
+    "TrackMapper",
 ]

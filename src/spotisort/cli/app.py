@@ -94,7 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     app = Application(settings)
 
     try:
-        return args.handler(app, args)
+        exit_code: int = args.handler(app, args)
+        return exit_code
     except SpotisortError as exc:
         logger.debug("Command failed.", exc_info=True)
         print(f"Error: {exc}", file=sys.stderr)
@@ -155,25 +156,25 @@ def _add_filter_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--search", help="only tracks matching this text (title/artist/album).")
 
 
-def _add_liked_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_liked_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("liked", help="list liked songs (optionally filtered).")
     _add_filter_arguments(parser)
     parser.add_argument("--limit", type=int, help="show at most this many tracks.")
     parser.set_defaults(handler=cmd_liked)
 
 
-def _add_playlists_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_playlists_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("playlists", help="list your playlists.")
     parser.set_defaults(handler=cmd_playlists)
 
 
-def _add_show_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_show_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("show", help="show a playlist and its tracks.")
     parser.add_argument("playlist", help="playlist name or id.")
     parser.set_defaults(handler=cmd_show)
 
 
-def _add_create_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_create_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("create", help="create a new playlist.")
     parser.add_argument("name", help="name for the new playlist.")
     parser.add_argument("--public", action="store_true", help="make the playlist public.")
@@ -182,21 +183,21 @@ def _add_create_command(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(handler=cmd_create)
 
 
-def _add_rename_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_rename_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("rename", help="rename a playlist.")
     parser.add_argument("playlist", help="playlist name or id.")
     parser.add_argument("new_name", help="the new name.")
     parser.set_defaults(handler=cmd_rename)
 
 
-def _add_delete_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_delete_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("delete", help="delete (unfollow) a playlist.")
     parser.add_argument("playlist", help="playlist name or id.")
     parser.add_argument("-y", "--yes", action="store_true", help="skip the confirmation prompt.")
     parser.set_defaults(handler=cmd_delete)
 
 
-def _add_copy_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_copy_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("copy", help="copy matching liked songs into a playlist.")
     parser.add_argument("--to", required=True, metavar="PLAYLIST",
                         help="destination playlist name (created if missing).")
@@ -204,7 +205,7 @@ def _add_copy_command(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(handler=cmd_copy)
 
 
-def _add_move_command(subparsers: argparse._SubParsersAction) -> None:
+def _add_move_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser(
         "move", help="move matching liked songs into a playlist (removes them from Liked Songs)."
     )
