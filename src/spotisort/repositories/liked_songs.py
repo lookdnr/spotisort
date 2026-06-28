@@ -5,12 +5,16 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
+from spotisort.api.exceptions import MappingError
 from spotisort.models import SavedTrack
 from spotisort.repositories.base import Repository
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["LikedSongsRepository"]
+
+#: How often (in items) to log progress while loading a large library.
+_PROGRESS_EVERY = 500
 
 
 class LikedSongsRepository(Repository):
@@ -24,16 +28,33 @@ class LikedSongsRepository(Repository):
     def list_all(self) -> list[SavedTrack]:
         """Fetch every saved track, following pagination automatically.
 
+        Items that cannot be mapped (e.g. a local file or unavailable track with
+        no usable metadata) are skipped with a warning rather than aborting the
+        whole load, since a single bad item should not break a large library.
+
         Returns:
-            All saved tracks in Spotify's order (most recently added first),
-            each paired with its ``added_at`` timestamp.
+            All readable saved tracks in Spotify's order (most recently added
+            first), each paired with its ``added_at`` timestamp.
         """
         page_size = self._limits.saved_tracks_page
         items = self._iter_offset_items(
             lambda limit, offset: self._client.saved_tracks(limit=limit, offset=offset),
             page_size=page_size,
         )
-        saved = [self._mapper.saved_tracks.map(item) for item in items]
+
+        saved: list[SavedTrack] = []
+        skipped = 0
+        for index, item in enumerate(items, start=1):
+            try:
+                saved.append(self._mapper.saved_tracks.map(item))
+            except MappingError as exc:
+                skipped += 1
+                logger.warning("Skipping an unreadable saved track: %s", exc)
+            if index % _PROGRESS_EVERY == 0:
+                logger.info("Loaded %d saved tracks so far...", index)
+
+        if skipped:
+            logger.warning("Skipped %d unreadable saved track(s).", skipped)
         logger.debug("Fetched %d saved track(s).", len(saved))
         return saved
 

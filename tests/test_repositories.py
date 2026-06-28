@@ -31,6 +31,17 @@ def test_liked_list_all_paginates(settings: Settings) -> None:
     assert [s.track.id for s in result] == [f"t{i}" for i in range(5)]
 
 
+def test_liked_list_all_skips_unreadable_items(settings: Settings) -> None:
+    good = saved_item(track_id="t1", name="ok")
+    bad = {"added_at": "2021-01-01T00:00:00Z", "track": {"id": "t2"}}  # missing name
+    client = FakeSpotifyClient(saved=[good, bad])
+    repo = LikedSongsRepository(client, limits=settings.batch_limits)
+
+    result = repo.list_all()
+
+    assert [s.track.id for s in result] == ["t1"]
+
+
 def test_liked_add_batches_by_limit(settings: Settings) -> None:
     client = FakeSpotifyClient()
     repo = LikedSongsRepository(client, limits=settings.batch_limits)
