@@ -10,5 +10,6 @@ from __future__ import annotations
 
 from spotisort.repositories.base import Repository
 from spotisort.repositories.liked_songs import LikedSongsRepository
+from spotisort.repositories.playlists import PlaylistRepository
 
-__all__ = ["Repository", "LikedSongsRepository"]
+__all__ = ["Repository", "LikedSongsRepository", "PlaylistRepository"]
