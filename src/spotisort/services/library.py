@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from datetime import UTC, date, datetime
 
 from spotisort.models import SavedTrack, Track
-from spotisort.repositories import LikedSongsRepository
+from spotisort.repositories.protocols import SavedTrackRepository
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class SpotifyLibrary:
         repository: The data source for saved tracks.
     """
 
-    def __init__(self, repository: LikedSongsRepository) -> None:
+    def __init__(self, repository: SavedTrackRepository) -> None:
         self._repository = repository
         self._cache: list[SavedTrack] | None = None
 

@@ -8,7 +8,7 @@ from collections.abc import Iterable, Sequence
 from spotisort.classification.base import TrackClassifier
 from spotisort.classification.taxonomy import GenreTaxonomy
 from spotisort.models import Track
-from spotisort.repositories import ArtistRepository
+from spotisort.repositories.protocols import ArtistSource
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,14 @@ class ArtistGenreProvider:
     """Resolves and caches artist genres, fetching them in bulk.
 
     Spotify only exposes genres on full artist objects, so this provider loads
-    them via :class:`ArtistRepository` and caches per artist id. An artist with
+    them via an :class:`ArtistSource` and caches per artist id. An artist with
     no genres (common) is cached as an empty tuple so it is not re-fetched.
 
     Args:
         repository: The artist data source.
     """
 
-    def __init__(self, repository: ArtistRepository) -> None:
+    def __init__(self, repository: ArtistSource) -> None:
         self._repository = repository
         self._cache: dict[str, tuple[str, ...]] = {}
 

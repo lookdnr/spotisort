@@ -12,6 +12,7 @@ from spotisort.cli.app import (
     _select_saved,
     build_parser,
     cmd_group_genre,
+    cmd_sync,
     cmd_unlike,
     main,
 )
@@ -138,6 +139,25 @@ def test_group_genre_keep_invokes_grouper_without_removing() -> None:
     assert cmd_group_genre(app, args) == 0
     assert grouper.called["remove"] is False
     assert grouper.called["template"] == "Genre: {category}"
+
+
+def test_sync_noop_when_cache_disabled() -> None:
+    args = build_parser().parse_args(["sync"])
+    app = SimpleNamespace(uses_cache=False)
+    assert cmd_sync(app, args) == 0
+
+
+def test_sync_clears_and_refreshes_when_cache_enabled() -> None:
+    args = build_parser().parse_args(["sync"])
+    cleared: list[bool] = []
+    library = SimpleNamespace(refresh=lambda: [make_saved("t1", "A", 2001)])
+    app = SimpleNamespace(
+        uses_cache=True,
+        clear_library_cache=lambda: cleared.append(True),
+        library=library,
+    )
+    assert cmd_sync(app, args) == 0
+    assert cleared == [True]
 
 
 def test_main_returns_two_without_config(monkeypatch: pytest.MonkeyPatch) -> None:

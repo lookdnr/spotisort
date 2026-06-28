@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv as _load_dotenv
@@ -35,6 +36,8 @@ __all__ = [
 
 DEFAULT_TOKEN_CACHE_PATH = Path(".cache-spotisort")
 DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_CACHE_PATH = Path(".spotisort-cache.db")
+DEFAULT_CACHE_TTL_SECONDS = 86400  # 24 hours
 
 #: OAuth scopes required for every operation spotisort performs. Reading and
 #: modifying liked songs needs the ``user-library-*`` scopes; reading and
@@ -54,6 +57,9 @@ _ENV_CLIENT_SECRET = "SPOTIFY_CLIENT_SECRET"
 _ENV_REDIRECT_URI = "SPOTIFY_REDIRECT_URI"
 _ENV_TOKEN_CACHE_PATH = "SPOTISORT_TOKEN_CACHE_PATH"
 _ENV_LOG_LEVEL = "SPOTISORT_LOG_LEVEL"
+_ENV_CACHE_PATH = "SPOTISORT_CACHE_PATH"
+_ENV_CACHE_TTL = "SPOTISORT_CACHE_TTL"
+_ENV_CACHE_ENABLED = "SPOTISORT_CACHE"
 
 
 # --------------------------------------------------------------------------- #
@@ -157,6 +163,9 @@ class Settings:
     log_level: str = DEFAULT_LOG_LEVEL
     retry: RetryPolicy = field(default_factory=RetryPolicy)
     batch_limits: BatchLimits = field(default_factory=BatchLimits)
+    cache_enabled: bool = True
+    cache_path: Path = DEFAULT_CACHE_PATH
+    cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS
 
     def __post_init__(self) -> None:
         if not self.client_id:
@@ -167,9 +176,12 @@ class Settings:
             raise ConfigurationError("redirect_uri must not be empty.")
         if not self.scopes:
             raise ConfigurationError("At least one OAuth scope is required.")
+        if self.cache_ttl_seconds < 0:
+            raise ConfigurationError("cache_ttl_seconds must not be negative.")
 
-        # Coerce a string path (e.g. supplied by a test) into a Path.
+        # Coerce string paths (e.g. supplied by a test) into Paths.
         object.__setattr__(self, "token_cache_path", Path(self.token_cache_path))
+        object.__setattr__(self, "cache_path", Path(self.cache_path))
 
         normalised_level = self.log_level.strip().upper()
         valid_levels = logging.getLevelNamesMapping()
@@ -184,6 +196,17 @@ class Settings:
     def log_level_value(self) -> int:
         """The numeric :mod:`logging` level corresponding to :attr:`log_level`."""
         return logging.getLevelNamesMapping()[self.log_level]
+
+    @property
+    def cache_ttl(self) -> timedelta | None:
+        """The liked-songs cache lifetime, or ``None`` when it never expires.
+
+        A configured value of ``0`` means cached data is kept until it is
+        explicitly refreshed or invalidated by a write.
+        """
+        if self.cache_ttl_seconds <= 0:
+            return None
+        return timedelta(seconds=self.cache_ttl_seconds)
 
     def scope_string(self) -> str:
         """Return the space-delimited scope string expected by the OAuth flow."""
@@ -233,6 +256,11 @@ class Settings:
             _read_optional(_ENV_TOKEN_CACHE_PATH) or str(DEFAULT_TOKEN_CACHE_PATH)
         )
         log_level = _read_optional(_ENV_LOG_LEVEL) or DEFAULT_LOG_LEVEL
+        cache_path = Path(_read_optional(_ENV_CACHE_PATH) or str(DEFAULT_CACHE_PATH))
+        cache_enabled = _read_bool(_ENV_CACHE_ENABLED, default=True)
+        cache_ttl_seconds = _read_int(
+            _ENV_CACHE_TTL, default=DEFAULT_CACHE_TTL_SECONDS, minimum=0
+        )
 
         return cls(
             client_id=client_id,
@@ -240,6 +268,9 @@ class Settings:
             redirect_uri=redirect_uri,
             token_cache_path=token_cache_path,
             log_level=log_level,
+            cache_enabled=cache_enabled,
+            cache_path=cache_path,
+            cache_ttl_seconds=cache_ttl_seconds,
         )
 
 
@@ -259,3 +290,36 @@ def _read_required(name: str, missing: list[str]) -> str:
 def _read_optional(name: str) -> str:
     """Read an optional env var, returning a stripped value or empty string."""
     return os.environ.get(name, "").strip()
+
+
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
+
+
+def _read_bool(name: str, *, default: bool) -> bool:
+    """Read an optional boolean env var, falling back to ``default``."""
+    raw = _read_optional(name).lower()
+    if not raw:
+        return default
+    if raw in _TRUE_VALUES:
+        return True
+    if raw in _FALSE_VALUES:
+        return False
+    raise ConfigurationError(
+        f"Invalid boolean for {name}: {raw!r}. Use one of: "
+        f"{', '.join(sorted(_TRUE_VALUES | _FALSE_VALUES))}."
+    )
+
+
+def _read_int(name: str, *, default: int, minimum: int | None = None) -> int:
+    """Read an optional integer env var, falling back to ``default``."""
+    raw = _read_optional(name)
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ConfigurationError(f"Invalid integer for {name}: {raw!r}.") from exc
+    if minimum is not None and value < minimum:
+        raise ConfigurationError(f"{name} must be >= {minimum}; got {value}.")
+    return value

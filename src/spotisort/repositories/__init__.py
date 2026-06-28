@@ -10,7 +10,18 @@ from __future__ import annotations
 
 from spotisort.repositories.artists import ArtistRepository
 from spotisort.repositories.base import Repository
+from spotisort.repositories.cached import CachedArtistRepository, CachedLikedSongsRepository
 from spotisort.repositories.liked_songs import LikedSongsRepository
 from spotisort.repositories.playlists import PlaylistRepository
+from spotisort.repositories.protocols import ArtistSource, SavedTrackRepository
 
-__all__ = ["ArtistRepository", "LikedSongsRepository", "PlaylistRepository", "Repository"]
+__all__ = [
+    "ArtistRepository",
+    "ArtistSource",
+    "CachedArtistRepository",
+    "CachedLikedSongsRepository",
+    "LikedSongsRepository",
+    "PlaylistRepository",
+    "Repository",
+    "SavedTrackRepository",
+]

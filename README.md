@@ -71,6 +71,9 @@ cp .env.example .env
 | `SPOTIFY_REDIRECT_URI`       | yes      | Must match a Redirect URI registered on the app.   |
 | `SPOTISORT_TOKEN_CACHE_PATH` | no       | Where to cache the OAuth token.                    |
 | `SPOTISORT_LOG_LEVEL`        | no       | Logging level (default `INFO`).                    |
+| `SPOTISORT_CACHE`            | no       | Enable the local SQLite cache (`on`/`off`, default `on`). |
+| `SPOTISORT_CACHE_PATH`       | no       | Cache database path (default `.spotisort-cache.db`). |
+| `SPOTISORT_CACHE_TTL`        | no       | Seconds before cached liked songs expire; `0` = never (default `86400`). |
 
 Add the same redirect URI (e.g. `http://127.0.0.1:8888/callback`) to your app's
 settings in the Spotify dashboard. The first run opens a browser to authorise
@@ -137,6 +140,28 @@ can be added later without changing the grouping logic. Note that Spotify
 deprecated the audio-features endpoint for new apps in November 2024, so a future
 mood feature would derive mood from genre, an LLM, or user-defined rules rather
 than valence/energy.
+
+## Caching
+
+A large library is slow to read — Spotify returns liked songs 50 at a time, so a
+10k-track library is ~200 sequential requests (~90s). spotisort keeps a local
+**SQLite cache** of your liked songs and of artist genres so that cost is paid
+once, not on every command.
+
+```bash
+spotisort sync                 # fetch the whole library into the cache (do this once)
+spotisort liked --year 2001    # now reads from the cache, near-instant
+spotisort --refresh liked      # clear the cache first, then read fresh
+spotisort --no-cache liked     # ignore the cache for this run (always live)
+```
+
+- Cached liked songs expire after `SPOTISORT_CACHE_TTL` (default 24h), and are
+  invalidated automatically whenever spotisort changes your library (`unlike`,
+  `move`, `group-genre`).
+- Artist genres are cached indefinitely (they don't change), which makes repeat
+  `group-genre` runs much faster.
+- The cache is purely a local optimisation; delete `.spotisort-cache.db` any time
+  to reset it. It's git-ignored.
 
 ## Development
 

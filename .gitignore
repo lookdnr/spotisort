@@ -3,6 +3,10 @@
 .cache-spotisort
 .cache*
 
+# Local cache database
+.spotisort-cache.db
+*.db
+
 # Python
 __pycache__/
 *.py[cod]

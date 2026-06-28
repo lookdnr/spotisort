@@ -14,19 +14,25 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from datetime import date
 from functools import cached_property
 
 from spotisort.api.client import SpotifyClient
 from spotisort.api.exceptions import SpotisortError
+from spotisort.cache import ArtistGenreCache, Database, LibraryCache
 from spotisort.classification import ArtistGenreProvider, GenreClassifier, GenreTaxonomy
 from spotisort.config import ConfigurationError, Settings
 from spotisort.mapping import SpotifyMapper
 from spotisort.models import Playlist, SavedTrack
 from spotisort.repositories import (
     ArtistRepository,
+    ArtistSource,
+    CachedArtistRepository,
+    CachedLikedSongsRepository,
     LikedSongsRepository,
     PlaylistRepository,
+    SavedTrackRepository,
 )
 from spotisort.services import (
     LibraryGrouper,
@@ -52,8 +58,9 @@ class Application:
     the parts of the stack it actually touches.
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, use_cache: bool = True) -> None:
         self.settings = settings
+        self.uses_cache = settings.cache_enabled and use_cache
 
     @cached_property
     def client(self) -> SpotifyClient:
@@ -64,16 +71,34 @@ class Application:
         return SpotifyMapper()
 
     @cached_property
-    def liked_repository(self) -> LikedSongsRepository:
-        return LikedSongsRepository(self.client, self.mapper, limits=self.settings.batch_limits)
+    def database(self) -> Database:
+        return Database(self.settings.cache_path)
+
+    @cached_property
+    def library_cache(self) -> LibraryCache:
+        return LibraryCache(self.database)
+
+    @cached_property
+    def artist_cache(self) -> ArtistGenreCache:
+        return ArtistGenreCache(self.database)
+
+    @cached_property
+    def liked_repository(self) -> SavedTrackRepository:
+        live = LikedSongsRepository(self.client, self.mapper, limits=self.settings.batch_limits)
+        if not self.uses_cache:
+            return live
+        return CachedLikedSongsRepository(live, self.library_cache, ttl=self.settings.cache_ttl)
 
     @cached_property
     def playlist_repository(self) -> PlaylistRepository:
         return PlaylistRepository(self.client, self.mapper, limits=self.settings.batch_limits)
 
     @cached_property
-    def artist_repository(self) -> ArtistRepository:
-        return ArtistRepository(self.client, self.mapper, limits=self.settings.batch_limits)
+    def artist_repository(self) -> ArtistSource:
+        live = ArtistRepository(self.client, self.mapper, limits=self.settings.batch_limits)
+        if not self.uses_cache:
+            return live
+        return CachedArtistRepository(live, self.artist_cache)
 
     @cached_property
     def library(self) -> SpotifyLibrary:
@@ -95,6 +120,11 @@ class Application:
     def grouper(self) -> LibraryGrouper:
         return LibraryGrouper(self.playlists, self.organiser)
 
+    def clear_library_cache(self) -> None:
+        """Drop the cached liked songs so the next read re-syncs from Spotify."""
+        if self.uses_cache:
+            self.library_cache.clear()
+
 
 # --------------------------------------------------------------------------- #
 # Entry point
@@ -113,7 +143,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     _configure_logging(settings, verbose=args.verbose)
-    app = Application(settings)
+    app = Application(settings, use_cache=not args.no_cache)
+    if args.refresh:
+        app.clear_library_cache()
 
     try:
         exit_code: int = args.handler(app, args)
@@ -152,6 +184,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="enable debug logging.",
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="bypass the local cache for this run (always read live from Spotify).",
+    )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="clear the cached liked songs before running (forces a re-sync).",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True, metavar="command")
 
     _add_liked_command(subparsers)
@@ -164,6 +206,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_move_command(subparsers)
     _add_unlike_command(subparsers)
     _add_group_genre_command(subparsers)
+    _add_sync_command(subparsers)
 
     return parser
 
@@ -247,6 +290,13 @@ def _add_unlike_command(subparsers: argparse._SubParsersAction[argparse.Argument
     parser.add_argument("-y", "--yes", action="store_true", help="skip the confirmation prompt.")
     _add_filter_arguments(parser)
     parser.set_defaults(handler=cmd_unlike)
+
+
+def _add_sync_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    parser = subparsers.add_parser(
+        "sync", help="re-fetch all liked songs into the local cache."
+    )
+    parser.set_defaults(handler=cmd_sync)
 
 
 def _add_group_genre_command(
@@ -421,6 +471,17 @@ def cmd_group_genre(app: Application, args: argparse.Namespace) -> int:
             f"{len(result.unclassified)} track(s) had no recognised genre "
             "and were left in Liked Songs."
         )
+    return 0
+
+
+def cmd_sync(app: Application, args: argparse.Namespace) -> int:
+    if not app.uses_cache:
+        print("Caching is disabled; nothing to sync.")
+        return 0
+    app.clear_library_cache()
+    started = time.time()
+    tracks = app.library.refresh()
+    print(f"Synced {len(tracks)} liked song(s) into the cache in {time.time() - started:.1f}s.")
     return 0
 
 
